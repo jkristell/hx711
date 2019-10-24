@@ -5,9 +5,9 @@
 //! [`embedded-hal`]: https://docs.rs/embedded-hal/0.2
 
 #![deny(missing_docs)]
-#![deny(warnings)]
 #![no_std]
-#![feature(never_type)]
+
+use core::convert::Infallible;
 
 extern crate embedded_hal as hal;
 
@@ -63,7 +63,7 @@ where
     }
 
     /// Retrieve the latest conversion value if available
-    pub fn retrieve(&mut self) -> nb::Result<i32, !> {
+    pub fn retrieve(&mut self) -> nb::Result<i32, Infallible> {
         self.pd_sck.set_low();
         if self.dout.is_high() {
             // Conversion not ready yet
