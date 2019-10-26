@@ -5,6 +5,7 @@
 //! [`embedded-hal`]: https://docs.rs/embedded-hal/0.2
 
 #![deny(missing_docs)]
+#![allow(deprecated)]
 #![no_std]
 
 use core::convert::Infallible;
@@ -16,6 +17,8 @@ extern crate nb;
 
 use hal::digital::InputPin;
 use hal::digital::OutputPin;
+
+use hal::blocking::delay::DelayUs;
 
 /// Maximum ADC value
 pub const MAX_VALUE: i32 = (1 << 23) - 1;
@@ -50,7 +53,9 @@ where
     /// Set the mode (channel and gain).
     pub fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
-        block!(self.retrieve()).unwrap();
+
+        //TODO: Fix
+        //block!(self.retrieve()).unwrap();
     }
 
     /// Reset the chip. Mode is Channel A Gain 128 after reset.
@@ -63,7 +68,11 @@ where
     }
 
     /// Retrieve the latest conversion value if available
-    pub fn retrieve(&mut self) -> nb::Result<i32, Infallible> {
+    pub fn retrieve<DELAY>(&mut self, delay: &mut DELAY) -> nb::Result<i32, Infallible>
+    where
+        DELAY: DelayUs<u16>,
+    
+    {
         self.pd_sck.set_low();
         if self.dout.is_high() {
             // Conversion not ready yet
@@ -74,11 +83,20 @@ where
         for _ in 0..24 {
             // Read 24 bits
             count <<= 1;
+
+            // Clock high
             self.pd_sck.set_high();
-            self.pd_sck.set_low();
+
+            delay.delay_us(1);
+
+            // Read out data
             if self.dout.is_high() {
                 count += 1;
             }
+
+            // Clock low
+            self.pd_sck.set_low();
+            delay.delay_us(1);
         }
 
         // Continue to set mode for next conversion
