@@ -8,15 +8,17 @@
 #![allow(deprecated)]
 #![no_std]
 
-extern crate embedded_hal as hal;
+use embedded_hal as hal;
+use nb::block;
 
-#[macro_use(block)]
-extern crate nb;
+use hal::{
+    digital::v2::{
+        InputPin,
+        OutputPin
+    },
+    blocking::delay::DelayUs,
+};
 
-use hal::digital::v2::InputPin;
-use hal::digital::v2::OutputPin;
-
-use hal::blocking::delay::DelayUs;
 
 /// Maximum ADC value
 pub const MAX_VALUE: i32 = (1 << 23) - 1;
@@ -58,11 +60,12 @@ where
     }
 
     /// Set the mode (channel and gain).
-    pub fn set_mode(&mut self, mode: Mode) {
+    pub fn set_mode<DELAY>(&mut self, mode: Mode, delay: &mut DELAY) -> Result<(), PINERR> 
+    where
+        DELAY: DelayUs<u16>,
+    {
         self.mode = mode;
-
-        //TODO: Fix
-        //block!(self.retrieve()).unwrap();
+        block!(self.retrieve(delay)).map(|_| ())
     }
 
 
