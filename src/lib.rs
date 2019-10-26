@@ -125,8 +125,8 @@ pub enum Mode {
 
 /// Convert 24 bit signed integer to i32
 fn i24_to_i32(x: i32) -> i32 {
-    if x >= 0x800000 {
-        x | !0xFFFFFF
+    if x >= 0x80_0000 {
+        x | !0x00FF_FFFF
     } else {
         x
     }
