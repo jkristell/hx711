@@ -103,6 +103,7 @@ where
         let n_reads = self.mode as u16;
         for _ in 0..n_reads {
             self.pd_sck.set_high();
+            delay.delay_us(1);
             self.pd_sck.set_low();
         }
 
