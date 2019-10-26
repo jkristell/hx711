@@ -105,6 +105,7 @@ where
             self.pd_sck.set_high();
             delay.delay_us(1);
             self.pd_sck.set_low();
+            delay.delay_us(1);
         }
 
         Ok(i24_to_i32(count))
