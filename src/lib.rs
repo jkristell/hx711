@@ -8,15 +8,13 @@
 #![allow(deprecated)]
 #![no_std]
 
-use core::convert::Infallible;
-
 extern crate embedded_hal as hal;
 
 #[macro_use(block)]
 extern crate nb;
 
-use hal::digital::InputPin;
-use hal::digital::OutputPin;
+use hal::digital::v2::InputPin;
+use hal::digital::v2::OutputPin;
 
 use hal::blocking::delay::DelayUs;
 
@@ -33,21 +31,30 @@ pub struct Hx711<IN, OUT> {
     mode: Mode,
 }
 
-impl<IN, OUT> Hx711<IN, OUT>
+
+impl<IN, OUT, PINERR> Hx711<IN, OUT>
 where
-    IN: InputPin,
-    OUT: OutputPin,
+    IN: InputPin<Error = PINERR>,
+    OUT: OutputPin<Error = PINERR>,
 {
     /// Creates a new driver from Input and Outut pins
-    pub fn new(dout: IN, mut pd_sck: OUT) -> Self {
-        pd_sck.set_low();
-        let mut hx711 = Hx711 {
+    pub fn new(dout: IN, pd_sck: OUT) -> Self {
+        let hx711 = Hx711 {
             dout,
             pd_sck,
             mode: Mode::ChAGain128,
         };
-        hx711.reset();
         hx711
+    }
+
+    /// Enable 
+    pub fn enable(&mut self) -> Result<(), PINERR> {
+        self.pd_sck.set_low()
+    }
+
+    /// Disable - after 60 us of clk high the chip will go to sleep
+    pub fn disable(&mut self) -> Result<(), PINERR> {
+        self.pd_sck.set_high()
     }
 
     /// Set the mode (channel and gain).
@@ -58,23 +65,27 @@ where
         //block!(self.retrieve()).unwrap();
     }
 
+
+    /*
     /// Reset the chip. Mode is Channel A Gain 128 after reset.
-    pub fn reset(&mut self) {
-        self.pd_sck.set_high();
+    pub fn reset(&mut self) -> Result<(), PINERR> {
+        self.pd_sck.set_high()?;
         for _ in 1..3 {
-            self.dout.is_high();
+            self.dout.is_high()?;
         }
-        self.pd_sck.set_low();
+        self.pd_sck.set_low()?;
+        Ok(())
     }
+    */
 
     /// Retrieve the latest conversion value if available
-    pub fn retrieve<DELAY>(&mut self, delay: &mut DELAY) -> nb::Result<i32, Infallible>
+    pub fn retrieve<DELAY>(&mut self, delay: &mut DELAY) -> nb::Result<i32, PINERR>
     where
         DELAY: DelayUs<u16>,
     
     {
-        self.pd_sck.set_low();
-        if self.dout.is_high() {
+        self.pd_sck.set_low()?;
+        if self.dout.is_high()? {
             // Conversion not ready yet
             return Err(nb::Error::WouldBlock);
         }
@@ -85,26 +96,26 @@ where
             count <<= 1;
 
             // Clock high
-            self.pd_sck.set_high();
+            self.pd_sck.set_high()?;
 
             delay.delay_us(1);
 
             // Read out data
-            if self.dout.is_high() {
+            if self.dout.is_high()? {
                 count += 1;
             }
 
             // Clock low
-            self.pd_sck.set_low();
+            self.pd_sck.set_low()?;
             delay.delay_us(1);
         }
 
         // Continue to set mode for next conversion
         let n_reads = self.mode as u16;
         for _ in 0..n_reads {
-            self.pd_sck.set_high();
+            self.pd_sck.set_high()?;
             delay.delay_us(1);
-            self.pd_sck.set_low();
+            self.pd_sck.set_low()?;
             delay.delay_us(1);
         }
 
