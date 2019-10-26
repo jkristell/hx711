@@ -92,6 +92,9 @@ where
             return Err(nb::Error::WouldBlock);
         }
 
+        // Dout falling -> clock high > 0.1 us 
+        delay.delay_us(1);
+
         let mut count: i32 = 0;
         for _ in 0..24 {
             // Read 24 bits
