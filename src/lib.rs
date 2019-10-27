@@ -84,7 +84,6 @@ where
     pub fn retrieve<DELAY>(&mut self, delay: &mut DELAY) -> nb::Result<i32, PINERR>
     where
         DELAY: DelayUs<u16>,
-    
     {
         self.pd_sck.set_low()?;
         if self.dout.is_high()? {
