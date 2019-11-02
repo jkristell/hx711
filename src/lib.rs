@@ -67,19 +67,6 @@ where
         block!(self.retrieve(delay)).map(|_| ())
     }
 
-
-    /*
-    /// Reset the chip. Mode is Channel A Gain 128 after reset.
-    pub fn reset(&mut self) -> Result<(), PINERR> {
-        self.pd_sck.set_high()?;
-        for _ in 1..3 {
-            self.dout.is_high()?;
-        }
-        self.pd_sck.set_low()?;
-        Ok(())
-    }
-    */
-
     /// Retrieve the latest conversion value if available
     pub fn retrieve<DELAY>(&mut self, delay: &mut DELAY) -> nb::Result<i32, PINERR>
     where
