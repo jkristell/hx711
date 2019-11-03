@@ -48,6 +48,11 @@ where
         hx711
     }
 
+    /// Destruct the device and hand back the pins
+    pub fn destroy(self) -> (IN, OUT) {
+        (self.dout, self.pd_sck)
+    }
+
     /// Enable 
     pub fn enable(&mut self) -> Result<(), PINERR> {
         self.pd_sck.set_low()
