@@ -7,15 +7,17 @@
 #![deny(missing_docs)]
 #![no_std]
 
-use core::convert::Infallible;
+use embedded_hal as hal;
+use nb::block;
 
-extern crate embedded_hal as hal;
+use hal::{
+    digital::v2::{
+        InputPin,
+        OutputPin
+    },
+    blocking::delay::DelayUs,
+};
 
-#[macro_use(block)]
-extern crate nb;
-
-use hal::digital::InputPin;
-use hal::digital::OutputPin;
 
 /// Maximum ADC value
 pub const MAX_VALUE: i32 = (1 << 23) - 1;
@@ -30,62 +32,87 @@ pub struct Hx711<IN, OUT> {
     mode: Mode,
 }
 
-impl<IN, OUT> Hx711<IN, OUT>
+
+impl<IN, OUT, PINERR> Hx711<IN, OUT>
 where
-    IN: InputPin,
-    OUT: OutputPin,
+    IN: InputPin<Error = PINERR>,
+    OUT: OutputPin<Error = PINERR>,
 {
     /// Creates a new driver from Input and Outut pins
-    pub fn new(dout: IN, mut pd_sck: OUT) -> Self {
-        pd_sck.set_low();
-        let mut hx711 = Hx711 {
+    pub fn new(dout: IN, pd_sck: OUT) -> Self {
+        let hx711 = Hx711 {
             dout,
             pd_sck,
             mode: Mode::ChAGain128,
         };
-        hx711.reset();
         hx711
     }
 
-    /// Set the mode (channel and gain).
-    pub fn set_mode(&mut self, mode: Mode) {
-        self.mode = mode;
-        block!(self.retrieve()).unwrap();
+    /// Destruct the device and hand back the pins
+    pub fn destroy(self) -> (IN, OUT) {
+        (self.dout, self.pd_sck)
     }
 
-    /// Reset the chip. Mode is Channel A Gain 128 after reset.
-    pub fn reset(&mut self) {
-        self.pd_sck.set_high();
-        for _ in 1..3 {
-            self.dout.is_high();
-        }
-        self.pd_sck.set_low();
+    /// Enable 
+    pub fn enable(&mut self) -> Result<(), PINERR> {
+        self.pd_sck.set_low()
+    }
+
+    /// Disable - after 60 us of clk high the chip will go to sleep
+    pub fn disable(&mut self) -> Result<(), PINERR> {
+        self.pd_sck.set_high()
+    }
+
+    /// Set the mode (channel and gain).
+    pub fn set_mode<DELAY>(&mut self, mode: Mode, delay: &mut DELAY) -> Result<(), PINERR> 
+    where
+        DELAY: DelayUs<u16>,
+    {
+        self.mode = mode;
+        block!(self.retrieve(delay)).map(|_| ())
     }
 
     /// Retrieve the latest conversion value if available
-    pub fn retrieve(&mut self) -> nb::Result<i32, Infallible> {
-        self.pd_sck.set_low();
-        if self.dout.is_high() {
+    pub fn retrieve<DELAY>(&mut self, delay: &mut DELAY) -> nb::Result<i32, PINERR>
+    where
+        DELAY: DelayUs<u16>,
+    {
+        self.pd_sck.set_low()?;
+        if self.dout.is_high()? {
             // Conversion not ready yet
             return Err(nb::Error::WouldBlock);
         }
+
+        // Dout falling -> clock high > 0.1 us 
+        delay.delay_us(1);
 
         let mut count: i32 = 0;
         for _ in 0..24 {
             // Read 24 bits
             count <<= 1;
-            self.pd_sck.set_high();
-            self.pd_sck.set_low();
-            if self.dout.is_high() {
+
+            // Clock high
+            self.pd_sck.set_high()?;
+
+            delay.delay_us(1);
+
+            // Read out data
+            if self.dout.is_high()? {
                 count += 1;
             }
+
+            // Clock low
+            self.pd_sck.set_low()?;
+            delay.delay_us(1);
         }
 
         // Continue to set mode for next conversion
         let n_reads = self.mode as u16;
         for _ in 0..n_reads {
-            self.pd_sck.set_high();
-            self.pd_sck.set_low();
+            self.pd_sck.set_high()?;
+            delay.delay_us(1);
+            self.pd_sck.set_low()?;
+            delay.delay_us(1);
         }
 
         Ok(i24_to_i32(count))
@@ -105,8 +132,8 @@ pub enum Mode {
 
 /// Convert 24 bit signed integer to i32
 fn i24_to_i32(x: i32) -> i32 {
-    if x >= 0x800000 {
-        x | !0xFFFFFF
+    if x >= 0x80_0000 {
+        x | !0x00FF_FFFF
     } else {
         x
     }
