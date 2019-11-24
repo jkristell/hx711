@@ -55,8 +55,12 @@ where
     }
 
     /// Enable 
-    pub fn enable(&mut self) -> Result<(), PINERR> {
-        self.pd_sck.set_low()
+    pub fn enable<DELAY>(&mut self, delay: &mut DELAY) -> Result<(), PINERR>
+    where
+        DELAY: DelayUs<u16>,
+    {
+        self.pd_sck.set_low()?;
+        self.set_mode(self.mode, delay)
     }
 
     /// Disable - after 60 us of clk high the chip will go to sleep
