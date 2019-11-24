@@ -60,8 +60,13 @@ where
     }
 
     /// Disable - after 60 us of clk high the chip will go to sleep
-    pub fn disable(&mut self) -> Result<(), PINERR> {
-        self.pd_sck.set_high()
+    pub fn disable<DELAY>(&mut self, delay: &mut DELAY) -> Result<(), PINERR>
+    where
+        DELAY: DelayUs<u16>,
+    {
+        self.pd_sck.set_high()?;
+        delay.delay_us(60);
+        Ok(())
     }
 
     /// Set the mode (channel and gain).
