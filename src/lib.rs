@@ -5,6 +5,7 @@
 //! [`embedded-hal`]: https://docs.rs/embedded-hal/0.2
 
 #![deny(missing_docs)]
+#![deny(warnings)]
 #![no_std]
 
 use embedded_hal as hal;
